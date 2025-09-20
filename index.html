@@ -234,44 +234,61 @@
         }
         function generateChallan() {
             const companyName = uiElements.companiesSelect.value;
-            const companyAddress = uiElements.companyAddress.value;
-            const gstNo = uiElements.gstNo.value;
             const challanNo = uiElements.challanNo.value;
             const clientChallanNo = uiElements.clientChallanNo.value;
             const challanDate = uiElements.challanDate.value;
             const vehicleNo = uiElements.vehicleNo.value;
             
-            if (!companyName || !challanNo || !challanDate) {
-                return showMessage('Please fill in Party\'s Name, Challan No., and Date.');
+            // Validate main fields
+            if (!companyName || !challanNo || !challanDate || !clientChallanNo || !vehicleNo) {
+                return showMessage('Please fill in all the top-level form fields.');
             }
-            const products = Array.from(document.querySelectorAll('#product-rows .product-row')).map(row => {
+            
+            const products = Array.from(document.querySelectorAll('#product-rows .product-row'));
+            
+            // Validate products
+            if (products.length === 0) {
+                return showMessage('Please add at least one product.');
+            }
+            
+            const validatedProducts = [];
+            for (const row of products) {
                 const descriptionElement = row.querySelector('.product-description');
                 let description = '';
-                if (descriptionElement) {
+                if (descriptionElement.tagName === 'SELECT') {
                     description = descriptionElement.value;
                 } else {
-                    const inputElement = row.querySelector('input.product-description');
-                    if (inputElement) {
-                        description = inputElement.value;
-                    }
+                    description = descriptionElement.value;
                 }
                 const hsn = row.querySelector('.product-hsn').value;
                 const qty = row.querySelector('.product-qty').value;
-                return { description, hsn, qty };
-            });
+                
+                if (!description || !hsn || !qty) {
+                    return showMessage('Please fill in all product details (Description, HSN, Qty) for each row.');
+                }
+                validatedProducts.push({ description, hsn, qty });
+            }
+            
             const challanData = {
                 companyName,
-                companyAddress,
-                gstNo,
+                companyAddress: uiElements.companyAddress.value,
+                gstNo: uiElements.gstNo.value,
                 challanNo,
                 clientChallanNo,
                 challanDate,
                 vehicleNo,
-                products: products,
+                products: validatedProducts,
                 createdAt: Date.now()
             };
+
+            // Calculate the NEXT challan number and save it for persistence on refresh
+            const nextChallanNo = (parseInt(challanNo) + 1).toString().padStart(3, '0');
+            localStorage.setItem('lastChallanNo', nextChallanNo);
             
             renderPrintableChallan(challanData);
+            
+            // NOTE: The line `uiElements.challanNo.value = nextChallanNo;` has been removed
+            // so the input field does not update until the page is refreshed.
         }
         function renderPrintableChallan(data) {
             document.getElementById('challan-template-company-name').textContent = data.companyName;
@@ -314,15 +331,14 @@
             productListContainer.appendChild(jobWorkRow);
             uiElements.challanTemplate.classList.remove('hidden');
         }
-        function resetForm() {
+        function clearForm() {
             uiElements.companiesSelect.value = '';
             uiElements.companyAddress.value = '';
             uiElements.gstNo.value = '';
-            uiElements.challanNo.value = '';
+            // Don't reset challan number here to maintain persistence
             uiElements.clientChallanNo.value = '';
             uiElements.challanDate.value = new Date().toISOString().split('T')[0];
             uiElements.vehicleNo.value = '';
-            
             uiElements.productRowsContainer.innerHTML = '';
             addProductRow();
         }
@@ -421,6 +437,27 @@
                 }
             }
         }
+        function openResetModal() {
+            uiElements.resetModal.style.display = 'flex';
+            uiElements.newChallanNoInput.focus();
+        }
+
+        function closeResetModal() {
+            uiElements.resetModal.style.display = 'none';
+        }
+
+        function resetChallanNumber() {
+            const newNumber = uiElements.newChallanNoInput.value.trim();
+            if (!newNumber || isNaN(parseInt(newNumber))) {
+                showMessage("Please enter a valid number.");
+                return;
+            }
+            const paddedNumber = newNumber.padStart(3, '0');
+            localStorage.setItem('lastChallanNo', paddedNumber);
+            uiElements.challanNo.value = paddedNumber;
+            closeResetModal();
+            showMessage(`Challan number reset to ${paddedNumber}.`);
+        }
         window.onload = () => {
              uiElements = {
                 mainForm: document.getElementById('main-form'),
@@ -438,8 +475,16 @@
                 newCompanyAddress: document.getElementById('new-company-address'),
                 newCompanyGst: document.getElementById('new-company-gst'),
                 companyListToRemove: document.getElementById('company-list-to-remove'),
+                resetModal: document.getElementById('reset-challan-modal'),
+                newChallanNoInput: document.getElementById('new-challan-no-input')
             };
-            resetForm();
+
+            // Get the last saved challan number from localStorage
+            const lastChallanNo = localStorage.getItem('lastChallanNo');
+            // If a number exists, set the input field to that number. Otherwise, start at 1.
+            uiElements.challanNo.value = lastChallanNo ? lastChallanNo : '001';
+
+            clearForm();
             populateCompanies();
             // Event Listeners
             uiElements.companiesSelect.addEventListener('change', (event) => {
@@ -457,12 +502,15 @@
             window.generateChallan = generateChallan;
             window.addProductRow = () => addProductRow();
             window.removeProductRow = removeProductRow;
-            window.resetForm = resetForm;
+            window.clearForm = clearForm;
             window.openManageCompaniesModal = openManageCompaniesModal;
             window.closeModal = closeModal;
             window.saveNewCompany = saveNewCompany;
             window.removeCompany = removeCompany;
             window.handleProductSelection = handleProductSelection;
+            window.openResetModal = openResetModal;
+            window.closeResetModal = closeResetModal;
+            window.resetChallanNumber = resetChallanNumber;
         };
     </script>
     <div class="container mx-auto p-4 md:p-8 print-hidden">
@@ -472,7 +520,7 @@
                 <div class="flex flex-col">
                     <label for="company-name" class="block text-sm font-medium text-gray-700">Party's Name ($M/s$)</label>
                     <div class="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 mt-1">
-                        <select id="company-name" class="block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                        <select id="company-name" class="block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
                             <option value="">Select a company</option>
                         </select>
                         <button onclick="openManageCompaniesModal()" class="bg-blue-600 text-white p-2 rounded-md shadow-sm hover:bg-blue-700 transition-colors text-sm font-bold whitespace-nowrap">Manage</button>
@@ -488,19 +536,19 @@
                 </div>
                 <div>
                     <label for="challan-no" class="block text-sm font-medium text-gray-700">Our Challan No.</label>
-                    <input type="text" id="challan-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" id="challan-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
                 <div>
                     <label for="client-challan-no" class="block text-sm font-medium text-gray-700">Ch. No.</label>
-                    <input type="text" id="client-challan-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" id="client-challan-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
                 <div>
                     <label for="challan-date" class="block text-sm font-medium text-gray-700">Date</label>
-                    <input type="date" id="challan-date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" id="challan-date" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
                 <div>
                     <label for="vehicle-no" class="block text-sm font-medium text-gray-700">Vehicle No.</label>
-                    <input type="text" id="vehicle-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" id="vehicle-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" required>
                 </div>
             </div>
             <div class="border-t border-gray-200 pt-6">
@@ -514,7 +562,7 @@
         <div class="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
             <button onclick="generateChallan()" class="bg-green-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-green-700 transition-colors">Generate Challan</button>
             <button onclick="window.print()" class="bg-gray-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Print</button>
-            <button onclick="resetForm()" class="bg-red-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-red-700 transition-colors">Reset Form</button>
+            <button onclick="openResetModal()" class="bg-gray-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Reset Challan No.</button>
         </div>
     </div>
     <!-- Manage Companies Modal -->
@@ -549,6 +597,21 @@
             </div>
             <div class="flex justify-end mt-6">
                 <button onclick="closeModal()" class="bg-gray-600 text-white py-2 px-4 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Close</button>
+            </div>
+        </div>
+    </div>
+    <!-- Reset Challan Modal -->
+    <div id="reset-challan-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold mb-4">Reset Challan Number</h2>
+            <p class="mb-4">Enter the number you want to start from. The challan number will be updated immediately.</p>
+            <div>
+                <label for="new-challan-no-input" class="block text-sm font-medium text-gray-700">Starting Challan No.</label>
+                <input type="text" id="new-challan-no-input" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button onclick="resetChallanNumber()" class="bg-green-600 text-white py-2 px-4 rounded-md shadow-lg hover:bg-green-700 transition-colors">Save</button>
+                <button onclick="closeResetModal()" class="bg-gray-600 text-white py-2 px-4 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Cancel</button>
             </div>
         </div>
     </div>
