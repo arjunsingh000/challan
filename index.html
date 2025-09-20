@@ -7,6 +7,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        @page {
+            size: A4;
+            margin: 0;
+        }
         @media print {
             body {
                 margin: 0;
@@ -29,6 +33,7 @@
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
+                page-break-inside: avoid;
             }
             .print-hidden {
                 display: none;
@@ -42,6 +47,9 @@
                 display: flex;
                 flex-direction: column;
                 box-sizing: border-box;
+                page-break-inside: avoid;
+            }
+            .challan-table, .challan-table tr {
                 page-break-inside: avoid;
             }
         }
@@ -76,24 +84,7 @@
 </head>
 <body>
     <script>
-        const uiElements = {
-            mainForm: document.getElementById('main-form'),
-            companiesSelect: document.getElementById('company-name'),
-            companyAddress: document.getElementById('company-address'),
-            gstNo: document.getElementById('gst-no'),
-            challanNo: document.getElementById('challan-no'),
-            clientChallanNo: document.getElementById('client-challan-no'),
-            challanDate: document.getElementById('challan-date'),
-            vehicleNo: document.getElementById('vehicle-no'),
-            productRowsContainer: document.getElementById('product-rows'),
-            challanTemplate: document.getElementById('challan-template'),
-            manageCompaniesModal: document.getElementById('manage-companies-modal'),
-            newCompanyName: document.getElementById('new-company-name'),
-            newCompanyAddress: document.getElementById('new-company-address'),
-            newCompanyGst: document.getElementById('new-company-gst'),
-            companyListToRemove: document.getElementById('company-list-to-remove'),
-        };
-
+        let uiElements = {};
         const defaultCompanies = {
             "Centruy Technology": {
                 address: "Plot -69 ,Sec - 69, Imt Faridabad 121005, Haryana",
@@ -112,7 +103,6 @@
                 gst: "06AAHCS3347L1Z2"
             }
         };
-
         const productsByCompany = {
             "Centruy Technology": [
                 "Bearing sleeve c118078/5",
@@ -151,7 +141,6 @@
                 "Control Shaft"
             ]
         };
-
         let companies = JSON.parse(localStorage.getItem('companies')) || defaultCompanies;
         
         function showMessage(message) {
@@ -162,7 +151,6 @@
                 statusMessage.classList.remove('opacity-100');
             }, 3000);
         }
-
         // --- UI & Form Handling Functions ---
         function addProductRow(product = { description: '', hsn: '', qty: '' }) {
             const rowCount = uiElements.productRowsContainer.children.length;
@@ -194,14 +182,12 @@
                 </button>
             `;
             uiElements.productRowsContainer.appendChild(newRow);
-
             const selectEl = newRow.querySelector('.product-description');
             populateProductDropdowns(selectEl);
             if (product.description) {
                 selectEl.value = product.description;
             }
         }
-
         function removeProductRow(button) {
             const row = button.closest('.product-row');
             if (row) {
@@ -209,14 +195,12 @@
                 updateSrNo();
             }
         }
-
         function updateSrNo() {
             const srNoInputs = document.querySelectorAll('.product-sr-no');
             srNoInputs.forEach((input, index) => {
                 input.value = index + 1;
             });
         }
-
         function handleProductSelection(selectElement) {
             if (selectElement.value === 'new-product') {
                 const parent = selectElement.parentElement;
@@ -245,11 +229,9 @@
                 
                 container.appendChild(input);
                 container.appendChild(revertButton);
-
                 parent.replaceChild(container, selectElement);
             }
         }
-
         function generateChallan() {
             const companyName = uiElements.companiesSelect.value;
             const companyAddress = uiElements.companyAddress.value;
@@ -262,7 +244,6 @@
             if (!companyName || !challanNo || !challanDate) {
                 return showMessage('Please fill in Party\'s Name, Challan No., and Date.');
             }
-
             const products = Array.from(document.querySelectorAll('#product-rows .product-row')).map(row => {
                 const descriptionElement = row.querySelector('.product-description');
                 let description = '';
@@ -278,7 +259,6 @@
                 const qty = row.querySelector('.product-qty').value;
                 return { description, hsn, qty };
             });
-
             const challanData = {
                 companyName,
                 companyAddress,
@@ -293,7 +273,6 @@
             
             renderPrintableChallan(challanData);
         }
-
         function renderPrintableChallan(data) {
             document.getElementById('challan-template-company-name').textContent = data.companyName;
             document.getElementById('challan-template-company-address').textContent = data.companyAddress;
@@ -305,10 +284,8 @@
             document.getElementById('challan-template-date').textContent = `${day}/${month}/${year}`;
             
             document.getElementById('challan-template-vehicle-no').textContent = data.vehicleNo;
-
             const productListContainer = document.getElementById('challan-product-list');
             productListContainer.innerHTML = '';
-
             data.products.forEach((product, index) => {
                 const newRow = document.createElement('tr');
                 newRow.innerHTML = `
@@ -319,7 +296,6 @@
                 `;
                 productListContainer.appendChild(newRow);
             });
-            
             const totalRows = 20;
             const emptyRowsToAdd = totalRows - data.products.length - 1;
             
@@ -333,14 +309,11 @@
                 `;
                 productListContainer.appendChild(emptyRow);
             }
-
             const jobWorkRow = document.createElement('tr');
             jobWorkRow.innerHTML = `<td colspan="4" class="p-2 text-left align-bottom border-t border-b border-l border-r border-black">JOB WORK ONLY</td>`;
             productListContainer.appendChild(jobWorkRow);
-
             uiElements.challanTemplate.classList.remove('hidden');
         }
-
         function resetForm() {
             uiElements.companiesSelect.value = '';
             uiElements.companyAddress.value = '';
@@ -353,7 +326,6 @@
             uiElements.productRowsContainer.innerHTML = '';
             addProductRow();
         }
-
         function populateCompanies() {
             uiElements.companiesSelect.innerHTML = '<option value="">Select a company</option>';
             for (const name in companies) {
@@ -363,19 +335,16 @@
                 uiElements.companiesSelect.appendChild(option);
             }
         }
-
         function openManageCompaniesModal() {
             renderCompanyListInModal();
             uiElements.manageCompaniesModal.style.display = 'flex';
         }
-
         function closeModal() {
             uiElements.manageCompaniesModal.style.display = 'none';
             uiElements.newCompanyName.value = '';
             uiElements.newCompanyAddress.value = '';
             uiElements.newCompanyGst.value = '';
         }
-
         function saveNewCompany() {
             const newCompanyName = uiElements.newCompanyName.value.trim();
             const newCompanyAddress = uiElements.newCompanyAddress.value.trim();
@@ -392,7 +361,6 @@
             };
             
             localStorage.setItem('companies', JSON.stringify(companies));
-
             populateCompanies();
             renderCompanyListInModal();
             
@@ -401,21 +369,18 @@
             uiElements.newCompanyGst.value = '';
             showMessage("New company added successfully!");
         }
-
         function removeCompany(companyName) {
             delete companies[companyName];
             localStorage.setItem('companies', JSON.stringify(companies));
             
             populateCompanies();
             renderCompanyListInModal();
-
             if (uiElements.companiesSelect.value === companyName) {
                 uiElements.companyAddress.value = '';
                 uiElements.gstNo.value = '';
             }
             showMessage(`'${companyName}' has been removed.`);
         }
-
         function renderCompanyListInModal() {
             uiElements.companyListToRemove.innerHTML = '';
             const companyNames = Object.keys(companies).sort();
@@ -424,7 +389,6 @@
                 uiElements.companyListToRemove.innerHTML = '<p class="text-gray-500 text-sm">No companies to remove.</p>';
                 return;
             }
-
             companyNames.forEach(name => {
                 const companyItem = document.createElement('div');
                 companyItem.className = 'flex items-center justify-between bg-gray-100 p-2 rounded-md';
@@ -435,11 +399,9 @@
                 uiElements.companyListToRemove.appendChild(companyItem);
             });
         }
-        
         function populateProductDropdowns(selectEl) {
             const selectedCompany = uiElements.companiesSelect.value;
             const products = productsByCompany[selectedCompany] || [];
-
             if (selectEl.tagName === 'SELECT') {
                 const currentValue = selectEl.value;
                 selectEl.innerHTML = '<option value="">Select a product</option>';
@@ -459,11 +421,26 @@
                 }
             }
         }
-
         window.onload = () => {
+             uiElements = {
+                mainForm: document.getElementById('main-form'),
+                companiesSelect: document.getElementById('company-name'),
+                companyAddress: document.getElementById('company-address'),
+                gstNo: document.getElementById('gst-no'),
+                challanNo: document.getElementById('challan-no'),
+                clientChallanNo: document.getElementById('client-challan-no'),
+                challanDate: document.getElementById('challan-date'),
+                vehicleNo: document.getElementById('vehicle-no'),
+                productRowsContainer: document.getElementById('product-rows'),
+                challanTemplate: document.getElementById('challan-template'),
+                manageCompaniesModal: document.getElementById('manage-companies-modal'),
+                newCompanyName: document.getElementById('new-company-name'),
+                newCompanyAddress: document.getElementById('new-company-address'),
+                newCompanyGst: document.getElementById('new-company-gst'),
+                companyListToRemove: document.getElementById('company-list-to-remove'),
+            };
             resetForm();
             populateCompanies();
-
             // Event Listeners
             uiElements.companiesSelect.addEventListener('change', (event) => {
                 const selectedCompany = event.target.value;
@@ -476,12 +453,11 @@
                 }
                 document.querySelectorAll('.product-description').forEach(populateProductDropdowns);
             });
-
             // Expose functions to the global scope for event handlers in HTML
             window.generateChallan = generateChallan;
             window.addProductRow = () => addProductRow();
             window.removeProductRow = removeProductRow;
-            window.resetChallanNumber = resetForm;
+            window.resetForm = resetForm;
             window.openManageCompaniesModal = openManageCompaniesModal;
             window.closeModal = closeModal;
             window.saveNewCompany = saveNewCompany;
@@ -489,7 +465,6 @@
             window.handleProductSelection = handleProductSelection;
         };
     </script>
-
     <div class="container mx-auto p-4 md:p-8 print-hidden">
         <div id="main-form" class="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-8">
             <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Challan Details</h1>
@@ -536,14 +511,12 @@
                 <button onclick="addProductRow()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors">Add Product</button>
             </div>
         </div>
-
         <div class="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
             <button onclick="generateChallan()" class="bg-green-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-green-700 transition-colors">Generate Challan</button>
             <button onclick="window.print()" class="bg-gray-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Print</button>
             <button onclick="resetForm()" class="bg-red-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-red-700 transition-colors">Reset Form</button>
         </div>
     </div>
-
     <!-- Manage Companies Modal -->
     <div id="manage-companies-modal" class="modal">
         <div class="modal-content">
@@ -567,22 +540,18 @@
                     <button onclick="saveNewCompany()" class="bg-green-600 text-white py-2 px-4 rounded-md shadow-lg hover:bg-green-700 transition-colors">Save New</button>
                 </div>
             </div>
-
             <hr class="border-t border-gray-200">
-
             <div class="space-y-4 mt-8">
                 <h3 class="text-xl font-semibold text-gray-800">Remove Existing Company</h3>
                 <div id="company-list-to-remove" class="space-y-2">
                     <!-- Company list will be dynamically added here -->
                 </div>
             </div>
-
             <div class="flex justify-end mt-6">
                 <button onclick="closeModal()" class="bg-gray-600 text-white py-2 px-4 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Close</button>
             </div>
         </div>
     </div>
-
     <!-- Challan Template Section -->
     <div id="challan-template" class="hidden">
         <div class="challan-page">
@@ -603,7 +572,6 @@
                     <p class="text-xs font-bold">Mob.- 9871049290</p>
                 </div>
             </div>
-
             <div class="grid grid-cols-2 gap-2 text-sm mb-4">
                 <div>
                     <p><strong>Ch:</strong><span id="challan-template-challan-no" class="text-lg"></span></p>
@@ -626,9 +594,8 @@
                     </div>
                 </div>
             </div>
-
             <!-- Product Table -->
-            <table class="w-full text-sm border-collapse table-fixed h-full border border-black">
+            <table class="w-full text-sm border-collapse table-fixed h-full border border-black challan-table">
                 <thead>
                     <tr>
                         <th class="w-[8%] text-left p-2 border-r border-black border-b border-t-0">Sr. No.</th>
