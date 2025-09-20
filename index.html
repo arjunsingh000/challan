@@ -8,6 +8,9 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         @media print {
+            body {
+                margin: 0;
+            }
             body * {
                 visibility: hidden;
             }
@@ -18,10 +21,14 @@
                 position: absolute;
                 left: 0;
                 top: 0;
-                width: 100%;
-                font-family: 'Inter', sans-serif;
+                width: 210mm;
                 height: 297mm;
+                font-family: 'Inter', sans-serif;
                 box-sizing: border-box;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
             }
             .print-hidden {
                 display: none;
@@ -34,6 +41,8 @@
                 height: 100%;
                 display: flex;
                 flex-direction: column;
+                box-sizing: border-box;
+                page-break-inside: avoid;
             }
         }
         body {
@@ -66,9 +75,423 @@
     </style>
 </head>
 <body>
+    <script>
+        const uiElements = {
+            mainForm: document.getElementById('main-form'),
+            companiesSelect: document.getElementById('company-name'),
+            companyAddress: document.getElementById('company-address'),
+            gstNo: document.getElementById('gst-no'),
+            challanNo: document.getElementById('challan-no'),
+            clientChallanNo: document.getElementById('client-challan-no'),
+            challanDate: document.getElementById('challan-date'),
+            vehicleNo: document.getElementById('vehicle-no'),
+            productRowsContainer: document.getElementById('product-rows'),
+            challanTemplate: document.getElementById('challan-template'),
+            manageCompaniesModal: document.getElementById('manage-companies-modal'),
+            newCompanyName: document.getElementById('new-company-name'),
+            newCompanyAddress: document.getElementById('new-company-address'),
+            newCompanyGst: document.getElementById('new-company-gst'),
+            companyListToRemove: document.getElementById('company-list-to-remove'),
+        };
+
+        const defaultCompanies = {
+            "Centruy Technology": {
+                address: "Plot -69 ,Sec - 69, Imt Faridabad 121005, Haryana",
+                gst: "06AAEFC7107N1ZD"
+            },
+            "Sood Associates ": {
+                address: "Plot - 06 ,Samaypur Road ,Faridabad 121005, Haryana",
+                gst: "06ABSPC4041J1ZP"
+            },
+            "Smitha Surgicals India Pvt Ltd": {
+                address: "Plot -111 ,Sec- 59 Faridabad 121005 , Haryana",
+                gst: "06AAECS9224K1Z3"
+            },
+            "Saifi Con Fab System Pvt Ltd": {
+                address: "Plot - 86-87 ,Sarurpur Industrial Area Faridabad",
+                gst: "06AAHCS3347L1Z2"
+            }
+        };
+
+        const productsByCompany = {
+            "Centruy Technology": [
+                "Bearing sleeve c118078/5",
+                "Bearing sleeve c64790/1 (item - 00470)",
+                "Bolzeen Pin",
+                "Bush B76952 (item - 00800)",
+                "Clamp Sleeve 47133558",
+                "Connecting Socket KP0056067 (item - 1010)",
+                "Control Shaft",
+                "Cyclonic Stud",
+                "Cylinder Blank 37506198",
+                "Guide c114621 (item - 00490)",
+                "Pin c20882(item - 00180)",
+                "Pin 3T40426R110 (item - 1410)",
+                "Piston c101576 (item - 00520)",
+                "Push Rod c73773/1 (item -00290)",
+                "Push Rod C73773/6 (item - 1190)",
+                "Ring KP0049400 (item - 1000)",
+                "Shaft Steel 772132",
+                "Shaft MLK/ 03943388",
+                "Snap Head Rivet I.H.0006/1",
+                "Spacer c20547",
+                "Spacer Bushing B51882/4 (item - 700)",
+                "Spacer Bushing B51882/3",
+                "Spacer Socket B51882/3",
+                "Tapper B57490",
+                "Tappet B57490 (item - 1510)",
+                "Tappet B65635",
+                "Valve Pin B58165/KI (item - 00780)",
+                "Volve Head Pin"
+            ],
+            "Saifi Con Fab System Pvt Ltd": [
+                "Hing Bush"
+            ],
+            "Sood Associates ": [
+                "Control Shaft"
+            ]
+        };
+
+        let companies = JSON.parse(localStorage.getItem('companies')) || defaultCompanies;
+        
+        function showMessage(message) {
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = message;
+            statusMessage.classList.add('opacity-100');
+            setTimeout(() => {
+                statusMessage.classList.remove('opacity-100');
+            }, 3000);
+        }
+
+        // --- UI & Form Handling Functions ---
+        function addProductRow(product = { description: '', hsn: '', qty: '' }) {
+            const rowCount = uiElements.productRowsContainer.children.length;
+            const newRow = document.createElement('div');
+            newRow.className = 'product-row grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-100 p-4 rounded-md border border-gray-200 relative';
+            newRow.innerHTML = `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Sr. No.</label>
+                    <input type="text" value="${rowCount + 1}" disabled class="mt-1 block w-full border-gray-300 rounded-md p-2 bg-gray-200 cursor-not-allowed product-sr-no">
+                </div>
+                <div class="col-span-1 md:col-span-2 relative">
+                    <label class="block text-sm font-medium text-gray-700">Description of Goods</label>
+                    <select onchange="handleProductSelection(this)" class="mt-1 block w-full border-gray-300 rounded-md p-2 product-description">
+                        <option value="">Select a product</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">HSN code</label>
+                    <input type="text" value="${product.hsn}" class="mt-1 block w-full border-gray-300 rounded-md p-2 product-hsn">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Qty.</label>
+                    <input type="text" value="${product.qty}" class="mt-1 block w-full border-gray-300 rounded-md p-2 product-qty">
+                </div>
+                <button onclick="removeProductRow(this)" class="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+            uiElements.productRowsContainer.appendChild(newRow);
+
+            const selectEl = newRow.querySelector('.product-description');
+            populateProductDropdowns(selectEl);
+            if (product.description) {
+                selectEl.value = product.description;
+            }
+        }
+
+        function removeProductRow(button) {
+            const row = button.closest('.product-row');
+            if (row) {
+                row.remove();
+                updateSrNo();
+            }
+        }
+
+        function updateSrNo() {
+            const srNoInputs = document.querySelectorAll('.product-sr-no');
+            srNoInputs.forEach((input, index) => {
+                input.value = index + 1;
+            });
+        }
+
+        function handleProductSelection(selectElement) {
+            if (selectElement.value === 'new-product') {
+                const parent = selectElement.parentElement;
+                
+                const container = document.createElement('div');
+                container.className = 'flex items-center space-x-2 w-full';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'mt-1 block w-full border-gray-300 rounded-md p-2 product-description';
+                input.placeholder = 'Enter new product name...';
+                
+                const revertButton = document.createElement('button');
+                revertButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m5.253 9H4.582a8.001 8.001 0 0015.356-2m-6.321-2H17.5a2.5 2.5 0 002.5-2.5v-7.5" />
+                                        </svg>`;
+                revertButton.className = 'revert-button';
+                revertButton.type = 'button';
+                revertButton.onclick = () => {
+                    const productSelect = document.createElement('select');
+                    productSelect.className = 'mt-1 block w-full border-gray-300 rounded-md p-2 product-description';
+                    productSelect.onchange = () => handleProductSelection(productSelect);
+                    parent.replaceChild(productSelect, container);
+                    populateProductDropdowns(productSelect);
+                };
+                
+                container.appendChild(input);
+                container.appendChild(revertButton);
+
+                parent.replaceChild(container, selectElement);
+            }
+        }
+
+        function generateChallan() {
+            const companyName = uiElements.companiesSelect.value;
+            const companyAddress = uiElements.companyAddress.value;
+            const gstNo = uiElements.gstNo.value;
+            const challanNo = uiElements.challanNo.value;
+            const clientChallanNo = uiElements.clientChallanNo.value;
+            const challanDate = uiElements.challanDate.value;
+            const vehicleNo = uiElements.vehicleNo.value;
+            
+            if (!companyName || !challanNo || !challanDate) {
+                return showMessage('Please fill in Party\'s Name, Challan No., and Date.');
+            }
+
+            const products = Array.from(document.querySelectorAll('#product-rows .product-row')).map(row => {
+                const descriptionElement = row.querySelector('.product-description');
+                let description = '';
+                if (descriptionElement) {
+                    description = descriptionElement.value;
+                } else {
+                    const inputElement = row.querySelector('input.product-description');
+                    if (inputElement) {
+                        description = inputElement.value;
+                    }
+                }
+                const hsn = row.querySelector('.product-hsn').value;
+                const qty = row.querySelector('.product-qty').value;
+                return { description, hsn, qty };
+            });
+
+            const challanData = {
+                companyName,
+                companyAddress,
+                gstNo,
+                challanNo,
+                clientChallanNo,
+                challanDate,
+                vehicleNo,
+                products: products,
+                createdAt: Date.now()
+            };
+            
+            renderPrintableChallan(challanData);
+        }
+
+        function renderPrintableChallan(data) {
+            document.getElementById('challan-template-company-name').textContent = data.companyName;
+            document.getElementById('challan-template-company-address').textContent = data.companyAddress;
+            document.getElementById('challan-template-gst-no').textContent = data.gstNo;
+            document.getElementById('challan-template-challan-no').textContent = data.challanNo;
+            document.getElementById('challan-template-client-challan-no').textContent = data.clientChallanNo;
+            
+            const [year, month, day] = data.challanDate.split('-');
+            document.getElementById('challan-template-date').textContent = `${day}/${month}/${year}`;
+            
+            document.getElementById('challan-template-vehicle-no').textContent = data.vehicleNo;
+
+            const productListContainer = document.getElementById('challan-product-list');
+            productListContainer.innerHTML = '';
+
+            data.products.forEach((product, index) => {
+                const newRow = document.createElement('tr');
+                newRow.innerHTML = `
+                    <td class="p-2 border-r border-l border-black align-top">${index + 1}</td>
+                    <td class="p-2 border-r border-black align-top">${product.description}</td>
+                    <td class="p-2 border-r border-black align-top">${product.hsn}</td>
+                    <td class="p-2 border-r border-black align-top">${product.qty}</td>
+                `;
+                productListContainer.appendChild(newRow);
+            });
+            
+            const totalRows = 20;
+            const emptyRowsToAdd = totalRows - data.products.length - 1;
+            
+            for (let i = 0; i < emptyRowsToAdd; i++) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td class="p-2 border-r border-l border-black">&nbsp;</td>
+                    <td class="p-2 border-r border-black">&nbsp;</td>
+                    <td class="p-2 border-r border-black">&nbsp;</td>
+                    <td class="p-2 border-r border-black">&nbsp;</td>
+                `;
+                productListContainer.appendChild(emptyRow);
+            }
+
+            const jobWorkRow = document.createElement('tr');
+            jobWorkRow.innerHTML = `<td colspan="4" class="p-2 text-left align-bottom border-t border-b border-l border-r border-black">JOB WORK ONLY</td>`;
+            productListContainer.appendChild(jobWorkRow);
+
+            uiElements.challanTemplate.classList.remove('hidden');
+        }
+
+        function resetForm() {
+            uiElements.companiesSelect.value = '';
+            uiElements.companyAddress.value = '';
+            uiElements.gstNo.value = '';
+            uiElements.challanNo.value = '';
+            uiElements.clientChallanNo.value = '';
+            uiElements.challanDate.value = new Date().toISOString().split('T')[0];
+            uiElements.vehicleNo.value = '';
+            
+            uiElements.productRowsContainer.innerHTML = '';
+            addProductRow();
+        }
+
+        function populateCompanies() {
+            uiElements.companiesSelect.innerHTML = '<option value="">Select a company</option>';
+            for (const name in companies) {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                uiElements.companiesSelect.appendChild(option);
+            }
+        }
+
+        function openManageCompaniesModal() {
+            renderCompanyListInModal();
+            uiElements.manageCompaniesModal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            uiElements.manageCompaniesModal.style.display = 'none';
+            uiElements.newCompanyName.value = '';
+            uiElements.newCompanyAddress.value = '';
+            uiElements.newCompanyGst.value = '';
+        }
+
+        function saveNewCompany() {
+            const newCompanyName = uiElements.newCompanyName.value.trim();
+            const newCompanyAddress = uiElements.newCompanyAddress.value.trim();
+            const newCompanyGst = uiElements.newCompanyGst.value.trim();
+            
+            if (!newCompanyName || !newCompanyAddress || !newCompanyGst) {
+                showMessage("All fields are required to add a new company.");
+                return;
+            }
+            
+            companies[newCompanyName] = {
+                address: newCompanyAddress,
+                gst: newCompanyGst
+            };
+            
+            localStorage.setItem('companies', JSON.stringify(companies));
+
+            populateCompanies();
+            renderCompanyListInModal();
+            
+            uiElements.newCompanyName.value = '';
+            uiElements.newCompanyAddress.value = '';
+            uiElements.newCompanyGst.value = '';
+            showMessage("New company added successfully!");
+        }
+
+        function removeCompany(companyName) {
+            delete companies[companyName];
+            localStorage.setItem('companies', JSON.stringify(companies));
+            
+            populateCompanies();
+            renderCompanyListInModal();
+
+            if (uiElements.companiesSelect.value === companyName) {
+                uiElements.companyAddress.value = '';
+                uiElements.gstNo.value = '';
+            }
+            showMessage(`'${companyName}' has been removed.`);
+        }
+
+        function renderCompanyListInModal() {
+            uiElements.companyListToRemove.innerHTML = '';
+            const companyNames = Object.keys(companies).sort();
+            
+            if (companyNames.length === 0) {
+                uiElements.companyListToRemove.innerHTML = '<p class="text-gray-500 text-sm">No companies to remove.</p>';
+                return;
+            }
+
+            companyNames.forEach(name => {
+                const companyItem = document.createElement('div');
+                companyItem.className = 'flex items-center justify-between bg-gray-100 p-2 rounded-md';
+                companyItem.innerHTML = `
+                    <span class="text-sm">${name}</span>
+                    <button onclick="removeCompany('${name}')" class="bg-red-500 text-white text-xs px-2 py-1 rounded-md hover:bg-red-600 transition-colors">Remove</button>
+                `;
+                uiElements.companyListToRemove.appendChild(companyItem);
+            });
+        }
+        
+        function populateProductDropdowns(selectEl) {
+            const selectedCompany = uiElements.companiesSelect.value;
+            const products = productsByCompany[selectedCompany] || [];
+
+            if (selectEl.tagName === 'SELECT') {
+                const currentValue = selectEl.value;
+                selectEl.innerHTML = '<option value="">Select a product</option>';
+                products.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product;
+                    option.textContent = product;
+                    selectEl.appendChild(option);
+                });
+                const newProductOption = document.createElement('option');
+                newProductOption.value = 'new-product';
+                newProductOption.textContent = 'Type a new product...';
+                selectEl.appendChild(newProductOption);
+                
+                if (products.includes(currentValue)) {
+                    selectEl.value = currentValue;
+                }
+            }
+        }
+
+        window.onload = () => {
+            resetForm();
+            populateCompanies();
+
+            // Event Listeners
+            uiElements.companiesSelect.addEventListener('change', (event) => {
+                const selectedCompany = event.target.value;
+                if (companies[selectedCompany]) {
+                    uiElements.companyAddress.value = companies[selectedCompany].address;
+                    uiElements.gstNo.value = companies[selectedCompany].gst;
+                } else {
+                    uiElements.companyAddress.value = '';
+                    uiElements.gstNo.value = '';
+                }
+                document.querySelectorAll('.product-description').forEach(populateProductDropdowns);
+            });
+
+            // Expose functions to the global scope for event handlers in HTML
+            window.generateChallan = generateChallan;
+            window.addProductRow = () => addProductRow();
+            window.removeProductRow = removeProductRow;
+            window.resetChallanNumber = resetForm;
+            window.openManageCompaniesModal = openManageCompaniesModal;
+            window.closeModal = closeModal;
+            window.saveNewCompany = saveNewCompany;
+            window.removeCompany = removeCompany;
+            window.handleProductSelection = handleProductSelection;
+        };
+    </script>
 
     <div class="container mx-auto p-4 md:p-8 print-hidden">
-        <div class="bg-white rounded-xl shadow-lg p-6 md:p-8">
+        <div id="main-form" class="bg-white rounded-xl shadow-lg p-6 md:p-8 mb-8">
             <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Challan Details</h1>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <div class="flex flex-col">
@@ -105,7 +528,6 @@
                     <input type="text" id="vehicle-no" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
                 </div>
             </div>
-
             <div class="border-t border-gray-200 pt-6">
                 <h2 class="text-xl font-semibold mb-4 text-gray-800">Products</h2>
                 <div id="product-rows" class="space-y-4">
@@ -113,6 +535,12 @@
                 </div>
                 <button onclick="addProductRow()" class="mt-4 w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors">Add Product</button>
             </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-center space-y-2 sm:space-y-0 sm:space-x-4">
+            <button onclick="generateChallan()" class="bg-green-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-green-700 transition-colors">Generate Challan</button>
+            <button onclick="window.print()" class="bg-gray-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Print</button>
+            <button onclick="resetForm()" class="bg-red-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-red-700 transition-colors">Reset Form</button>
         </div>
     </div>
 
@@ -226,427 +654,6 @@
             </div>
         </div>
     </div>
-
-    <div class="text-center mt-6 print-hidden flex justify-center space-x-4">
-        <button onclick="generateChallan()" class="bg-green-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-green-700 transition-colors">Generate Challan</button>
-        <button onclick="window.print()" class="bg-gray-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-gray-700 transition-colors">Print</button>
-        <button onclick="resetChallanNumber()" class="bg-red-600 text-white py-2 px-6 rounded-md shadow-lg hover:bg-red-700 transition-colors">Reset Challan No.</button>
-    </div>
     <div id="status-message" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-md shadow-xl transition-opacity duration-300 opacity-0"></div>
-
-    <script>
-        // Default company data
-        const defaultCompanies = {
-            "Centruy Technology": {
-                address: "Plot -69 ,Sec - 69, Imt Faridabad 121005, Haryana",
-                gst: "06AAEFC7107N1ZD"
-            },
-            "Sood Associates ": {
-                address: "Plot - 06 ,Samaypur Road ,Faridabad 121005, Haryana",
-                gst: "06ABSPC4041J1ZP"
-            },
-            "Smitha Surgicals India Pvt Ltd": {
-                address: "Plot -111 ,Sec- 59 Faridabad 121005 , Haryana",
-                gst: "06AAECS9224K1Z3"
-            },
-            "Saifi Con Fab System Pvt Ltd": {
-                address: "Plot - 86-87 ,Sarurpur Industrial Area Faridabad",
-                gst: "06AAHCS3347L1Z2"
-            }
-        };
-
-        // Product data for each company
-        const productsByCompany = {
-            "Centruy Technology": [
-                "Bearing sleeve c118078/5",
-                "Bearing sleeve c64790/1 (item - 00470)",
-                "Bolzeen Pin",
-                "Bush B76952 (item - 00800)",
-                "Clamp Sleeve 47133558",
-                "Connecting Socket KP0056067 (item - 1010)",
-                "Control Shaft",
-                "Cyclonic Stud",
-                "Cylinder Blank 37506198",
-                "Guide c114621 (item - 00490)",
-                "Pin c20882(item - 00180)",
-                "Pin 3T40426R110 (item - 1410)",
-                "Piston c101576 (item - 00520)",
-                "Push Rod c73773/1 (item -00290)",
-                "Push Rod C73773/6 (item - 1190)",
-                "Ring KP0049400 (item - 1000)",
-                "Shaft Steel 772132",
-                "Shaft MLK/ 03943388",
-                "Snap Head Rivet I.H.0006/1",
-                "Spacer c20547",
-                "Spacer Bushing B51882/4 (item - 700)",
-                "Spacer Bushing B51882/3",
-                "Spacer Socket B51882/3",
-                "Tapper B57490",
-                "Tappet B57490 (item - 1510)",
-                "Tappet B65635",
-                "Valve Pin B58165/KI (item - 00780)",
-                "Volve Head Pin"
-            ],
-            "Saifi Con Fab System Pvt Ltd": [
-                "Hing Bush"
-            ],
-            "Sood Associates ": [
-                "Control Shaft"
-            ]
-        };
-
-        let companies = {};
-
-        function showMessage(message) {
-            const statusMessage = document.getElementById('status-message');
-            statusMessage.textContent = message;
-            statusMessage.classList.add('opacity-100');
-            setTimeout(() => {
-                statusMessage.classList.remove('opacity-100');
-            }, 3000);
-        }
-
-        function addProductRow() {
-            const productRowsContainer = document.getElementById('product-rows');
-            const rowCount = productRowsContainer.children.length + 1;
-
-            const newRow = document.createElement('div');
-            newRow.className = 'product-row grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-100 p-4 rounded-md border border-gray-200 relative';
-            newRow.innerHTML = `
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Sr. No.</label>
-                    <input type="text" value="${rowCount}" disabled class="mt-1 block w-full border-gray-300 rounded-md p-2 bg-gray-200 cursor-not-allowed product-sr-no">
-                </div>
-                <div class="col-span-1 md:col-span-2 relative">
-                    <label class="block text-sm font-medium text-gray-700">Description of Goods</label>
-                    <select onchange="handleProductSelection(this)" class="mt-1 block w-full border-gray-300 rounded-md p-2 product-description">
-                        <option value="">Select a product</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">HSN code</label>
-                    <input type="text" class="mt-1 block w-full border-gray-300 rounded-md p-2 product-hsn">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Qty.</label>
-                    <input type="text" class="mt-1 block w-full border-gray-300 rounded-md p-2 product-qty">
-                </div>
-                <button onclick="removeProductRow(this)" class="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                </button>
-            `;
-            productRowsContainer.appendChild(newRow);
-            populateProductDropdowns();
-            updateSrNo();
-        }
-
-        function removeProductRow(button) {
-            const row = button.closest('.product-row');
-            if (row) {
-                row.remove();
-                updateSrNo();
-            }
-        }
-        
-        function updateSrNo() {
-            const srNoInputs = document.querySelectorAll('.product-sr-no');
-            srNoInputs.forEach((input, index) => {
-                input.value = index + 1;
-            });
-        }
-
-        function handleProductSelection(selectElement) {
-            if (selectElement.value === 'new-product') {
-                const parent = selectElement.parentElement;
-                
-                const container = document.createElement('div');
-                container.className = 'flex items-center space-x-2 w-full';
-                
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.className = 'mt-1 block w-full border-gray-300 rounded-md p-2 product-description';
-                input.placeholder = 'Enter new product name...';
-                
-                const revertButton = document.createElement('button');
-                revertButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 hover:text-gray-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m5.253 9H4.582a8.001 8.001 0 0015.356-2m-6.321-2H17.5a2.5 2.5 0 002.5-2.5v-7.5" />
-                                        </svg>`;
-                revertButton.className = 'revert-button';
-                revertButton.type = 'button';
-                revertButton.onclick = () => {
-                    const productSelect = document.createElement('select');
-                    productSelect.className = 'mt-1 block w-full border-gray-300 rounded-md p-2 product-description';
-                    productSelect.onchange = () => handleProductSelection(productSelect);
-                    parent.replaceChild(productSelect, container);
-                    populateProductDropdowns();
-                };
-                
-                container.appendChild(input);
-                container.appendChild(revertButton);
-
-                parent.replaceChild(container, selectElement);
-            }
-        }
-
-        function generateChallan() {
-            const companyName = document.getElementById('company-name').value;
-            const companyAddress = document.getElementById('company-address').value;
-            const gstNo = document.getElementById('gst-no').value;
-            const challanNo = document.getElementById('challan-no').value;
-            const clientChallanNo = document.getElementById('client-challan-no').value;
-            const challanDate = document.getElementById('challan-date').value;
-            const vehicleNo = document.getElementById('vehicle-no').value;
-            
-            try {
-                localStorage.setItem('lastChallanNumber', challanNo);
-            } catch (e) {
-                console.error("Could not save to localStorage: ", e);
-            }
-
-            document.getElementById('challan-template-company-name').textContent = companyName;
-            document.getElementById('challan-template-company-address').textContent = companyAddress;
-            document.getElementById('challan-template-gst-no').textContent = gstNo;
-            document.getElementById('challan-template-challan-no').textContent = challanNo.padStart(3, '0');
-            document.getElementById('challan-template-client-challan-no').textContent = clientChallanNo;
-            
-            const [year, month, day] = challanDate.split('-');
-            document.getElementById('challan-template-date').textContent = `${day}/${month}/${year}`;
-            
-            document.getElementById('challan-template-vehicle-no').textContent = vehicleNo;
-
-            const productRows = document.querySelectorAll('#product-rows .product-row');
-            const productListContainer = document.getElementById('challan-product-list');
-            productListContainer.innerHTML = '';
-
-            productRows.forEach((row, index) => {
-                const descriptionElement = row.querySelector('.product-description');
-                let description = '';
-                if (descriptionElement) {
-                    description = descriptionElement.value;
-                } else {
-                    const inputElement = row.querySelector('input.product-description');
-                    if (inputElement) {
-                        description = inputElement.value;
-                    }
-                }
-                const hsn = row.querySelector('.product-hsn').value;
-                const qty = row.querySelector('.product-qty').value;
-
-                const newRow = document.createElement('tr');
-                newRow.innerHTML = `
-                    <td class="p-2 border-r border-l border-black align-top">${index + 1}</td>
-                    <td class="p-2 border-r border-black align-top">${description}</td>
-                    <td class="p-2 border-r border-black align-top">${hsn}</td>
-                    <td class="p-2 border-r border-black align-top">${qty}</td>
-                `;
-                productListContainer.appendChild(newRow);
-            });
-            
-            const totalRows = 20; 
-            const emptyRowsToAdd = totalRows - productRows.length - 1; 
-            
-            for (let i = 0; i < emptyRowsToAdd; i++) {
-                const emptyRow = document.createElement('tr');
-                emptyRow.innerHTML = `
-                    <td class="p-2 border-r border-l border-black">&nbsp;</td>
-                    <td class="p-2 border-r border-black">&nbsp;</td>
-                    <td class="p-2 border-r border-black">&nbsp;</td>
-                    <td class="p-2 border-r border-black">&nbsp;</td>
-                `;
-                productListContainer.appendChild(emptyRow);
-            }
-
-            const jobWorkRow = document.createElement('tr');
-            jobWorkRow.innerHTML = `<td colspan="4" class="p-2 text-left align-bottom border-t border-b border-l border-r border-black">JOB WORK ONLY</td>`;
-            productListContainer.appendChild(jobWorkRow);
-
-            document.getElementById('challan-template').classList.remove('hidden');
-        }
-
-        function resetChallanNumber() {
-            try {
-                localStorage.removeItem('lastChallanNumber');
-            } catch (e) {
-                console.error("Could not reset localStorage: ", e);
-            }
-            initializeApp();
-            
-            showMessage('Challan number has been reset.');
-        }
-
-        function populateCompanies() {
-            const companySelect = document.getElementById('company-name');
-            companySelect.innerHTML = '<option value="">Select a company</option>';
-            for (const name in companies) {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                companySelect.appendChild(option);
-            }
-        }
-        
-        function openManageCompaniesModal() {
-            renderCompanyListInModal();
-            document.getElementById('manage-companies-modal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('manage-companies-modal').style.display = 'none';
-            document.getElementById('new-company-name').value = '';
-            document.getElementById('new-company-address').value = '';
-            document.getElementById('new-company-gst').value = '';
-        }
-
-        function saveNewCompany() {
-            const newCompanyName = document.getElementById('new-company-name').value.trim();
-            const newCompanyAddress = document.getElementById('new-company-address').value.trim();
-            const newCompanyGst = document.getElementById('new-company-gst').value.trim();
-            
-            if (!newCompanyName || !newCompanyAddress || !newCompanyGst) {
-                showMessage("All fields are required to add a new company.");
-                return;
-            }
-            
-            companies[newCompanyName] = {
-                address: newCompanyAddress,
-                gst: newCompanyGst
-            };
-            
-            try {
-                localStorage.setItem('companies', JSON.stringify(companies));
-            } catch (e) {
-                console.error("Could not save to localStorage: ", e);
-            }
-            
-            populateCompanies();
-            renderCompanyListInModal();
-            
-            document.getElementById('new-company-name').value = '';
-            document.getElementById('new-company-address').value = '';
-            document.getElementById('new-company-gst').value = '';
-
-            showMessage("New company added successfully!");
-        }
-
-        function removeCompany(companyName) {
-            delete companies[companyName];
-            
-            try {
-                localStorage.setItem('companies', JSON.stringify(companies));
-            } catch (e) {
-                console.error("Could not save to localStorage: ", e);
-            }
-            
-            populateCompanies();
-            renderCompanyListInModal();
-
-            const companySelect = document.getElementById('company-name');
-            if (companySelect.value === companyName) {
-                document.getElementById('company-address').value = '';
-                document.getElementById('gst-no').value = '';
-            }
-
-            showMessage(`'${companyName}' has been removed.`);
-        }
-
-        function renderCompanyListInModal() {
-            const companyListContainer = document.getElementById('company-list-to-remove');
-            companyListContainer.innerHTML = '';
-            
-            const companyNames = Object.keys(companies).sort();
-            
-            if (companyNames.length === 0) {
-                companyListContainer.innerHTML = '<p class="text-gray-500 text-sm">No companies to remove.</p>';
-                return;
-            }
-
-            companyNames.forEach(name => {
-                const companyItem = document.createElement('div');
-                companyItem.className = 'flex items-center justify-between bg-gray-100 p-2 rounded-md';
-                companyItem.innerHTML = `
-                    <span class="text-sm">${name}</span>
-                    <button onclick="removeCompany('${name}')" class="bg-red-500 text-white text-xs px-2 py-1 rounded-md hover:bg-red-600 transition-colors">Remove</button>
-                `;
-                companyListContainer.appendChild(companyItem);
-            });
-        }
-        
-        function populateProductDropdowns() {
-            const selectedCompany = document.getElementById('company-name').value;
-            const productDropdowns = document.querySelectorAll('.product-description');
-            const products = productsByCompany[selectedCompany] || [];
-
-            productDropdowns.forEach(dropdown => {
-                if (dropdown.tagName === 'SELECT') {
-                    const currentValue = dropdown.value;
-                    dropdown.innerHTML = '<option value="">Select a product</option>';
-                    products.forEach(product => {
-                        const option = document.createElement('option');
-                        option.value = product;
-                        option.textContent = product;
-                        dropdown.appendChild(option);
-                    });
-                    const newProductOption = document.createElement('option');
-                    newProductOption.value = 'new-product';
-                    newProductOption.textContent = 'Type a new product...';
-                    dropdown.appendChild(newProductOption);
-
-                    if (products.includes(currentValue)) {
-                        dropdown.value = currentValue;
-                    }
-                }
-            });
-        }
-
-
-        function initializeApp() {
-            try {
-                const savedCompanies = localStorage.getItem('companies');
-                companies = savedCompanies ? JSON.parse(savedCompanies) : defaultCompanies;
-            } catch (e) {
-                console.error("Could not load from localStorage: ", e);
-                companies = defaultCompanies;
-            }
-            
-            populateCompanies();
-
-            const companySelect = document.getElementById('company-name');
-            companySelect.addEventListener('change', (event) => {
-                const selectedCompany = event.target.value;
-                if (companies[selectedCompany]) {
-                    document.getElementById('company-address').value = companies[selectedCompany].address;
-                    document.getElementById('gst-no').value = companies[selectedCompany].gst;
-                } else {
-                    document.getElementById('company-address').value = '';
-                    document.getElementById('gst-no').value = '';
-                }
-                populateProductDropdowns();
-            });
-            
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = (today.getMonth() + 1).toString().padStart(2, '0');
-            const day = today.getDate().toString().padStart(2, '0');
-            document.getElementById('challan-date').value = `${year}-${month}-${day}`;
-
-            let nextChallanNumber = 1;
-            try {
-                const lastChallanNumber = localStorage.getItem('lastChallanNumber');
-                nextChallanNumber = lastChallanNumber ? parseInt(lastChallanNumber, 10) + 1 : 1;
-            } catch (e) {
-                console.error("Could not retrieve from localStorage: ", e);
-            }
-            document.getElementById('challan-no').value = nextChallanNumber.toString().padStart(3, '0');
-
-            if (document.querySelectorAll('#product-rows .product-row').length === 0) {
-                 addProductRow();
-            }
-        }
-
-        window.onload = initializeApp;
-
-    </script>
 </body>
 </html>
